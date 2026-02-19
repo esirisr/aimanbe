@@ -1,42 +1,45 @@
 import jwt from 'jsonwebtoken';
 
+// Master Admin Configuration
 const MASTER_EMAIL = 'himilo@gmail.com';
 
-export const protect = async (req, res, next) => {
-  let token;
-  const authHeader = req.headers.authorization || req.headers.Authorization;
-
-  if (authHeader && authHeader.startsWith('Bearer')) {
-    try {
-      token = authHeader.split(' ')[1];
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = decoded;
-      next();
-    } catch (error) {
-      console.error("JWT Verification Error:", error.message);
-      return res.status(401).json({ message: 'Not authorized, token failed' });
-    }
+export const protect = (req, res, next) => {
+  // 1. Grab token from Header
+  const token = req.headers.authorization?.split(" ")[1];
+  
+  if (!token) {
+    return res.status(401).json({ message: "Not authorized, no token" });
   }
 
-  if (!token) {
-    return res.status(401).json({ message: 'Not authorized, no token provided' });
+  try {
+    // 2. Verify Token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // 3. Attach user data to request object
+    // Note: We include email in the token during login now (from previous step)
+    req.user = decoded; 
+    next();
+  } catch (err) {
+    res.status(401).json({ message: "Token is not valid" });
   }
 };
 
 export const authorize = (...roles) => {
   return (req, res, next) => {
-    // 1. Master Admin Override (Case-insensitive)
-    if (req.user && req.user.email.toLowerCase() === MASTER_EMAIL.toLowerCase()) {
+    // --- MASTER ADMIN OVERRIDE ---
+    // If the user's email is the master admin, allow access regardless of the roles list
+    if (req.user && req.user.email === MASTER_EMAIL) {
       return next();
     }
 
-    // 2. Role Check
+    // Standard Role Check
     if (!req.user || !roles.includes(req.user.role)) {
-      return res.status(403).json({
+      return res.status(403).json({ 
         success: false,
-        message: `Access denied: ${req.user?.role || 'User'} role unauthorized`
+        message: `Role ${req.user?.role || 'unknown'} is not authorized to access this route` 
       });
     }
+
     next();
   };
 };

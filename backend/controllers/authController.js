@@ -2,130 +2,109 @@ import User from '../models/User.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
+// Master Admin Configuration
 const MASTER_EMAIL = 'himilo@gmail.com';
 
-// ================= REGISTER =================
+// --- REGISTER CONTROLLER ---
 export const register = async (req, res) => {
   try {
-    const { name, email, password, phone, location, role } = req.body;
+    const { name, email, password, role, location, phone, skills } = req.body;
 
-    // Validate required fields
-    if (!name || !email || !password || !phone || !location) {
-      return res.status(400).json({
-        message: "Name, email, password, phone, and location are required"
-      });
-    }
-
+    // 1. Strict Email Check & Normalization
     const normalizedEmail = email.toLowerCase().trim();
-
-    // Check if user already exists
-    const userExists = await User.findOne({ email: normalizedEmail });
-    if (userExists) {
-      return res.status(400).json({ message: "User already exists" });
+    const existingUser = await User.findOne({ email: normalizedEmail });
+    if (existingUser) {
+      return res.status(400).json({ message: "An account with this email already exists." });
     }
 
-    // Hash password
+    // 2. Hash Password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Prevent public users from registering as admin
-    let assignedRole = 'client';
-
+    // --- ROLE LOGIC ---
+    // If the email is the master email, force 'admin' role regardless of what frontend sent
+    let assignedRole = role;
     if (normalizedEmail === MASTER_EMAIL) {
       assignedRole = 'admin';
-    } else if (role === 'pro') {
-      assignedRole = 'pro';
     }
 
-    const user = await User.create({
+    // 3. Create User Document
+    const newUser = new User({
       name,
       email: normalizedEmail,
       password: hashedPassword,
+      role: assignedRole, // Uses the logic from above
       phone,
-      location: location.toLowerCase().trim(),
-      role: assignedRole
+      location: location ? location.toLowerCase().trim() : 'hargeisa',
+      skills: assignedRole === 'pro' ? (Array.isArray(skills) ? skills : [skills]) : []
     });
 
-    res.status(201).json({
-      success: true,
-      message: "User registered successfully",
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role
-      }
+    await newUser.save();
+    
+    res.status(201).json({ 
+      success: true, 
+      message: `Registration successful! ${assignedRole === 'admin' ? 'Admin account created.' : ''}` 
     });
 
   } catch (error) {
-    console.error("REGISTER_ERROR:", error.message);
-    res.status(500).json({
-      message: "Registration failed",
-      error: error.message
-    });
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(val => val.message);
+      return res.status(400).json({ message: messages[0] });
+    }
+    res.status(500).json({ message: "Registration failed", error: error.message });
   }
 };
 
-// ================= LOGIN =================
+// --- LOGIN CONTROLLER ---
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({
-        message: "Email and password are required"
-      });
-    }
-
     const normalizedEmail = email.toLowerCase().trim();
 
+    // 1. Find user
     const user = await User.findOne({ email: normalizedEmail });
+    
     if (!user) {
-      return res.status(401).json({
-        message: "Invalid email or password"
-      });
+      return res.status(400).json({ message: "No account found with this email." });
     }
 
+    // 2. Comprehensive check for password match
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({
-        message: "Invalid email or password"
-      });
+      return res.status(400).json({ message: "Incorrect password." });
     }
 
-    if (!process.env.JWT_SECRET) {
-      console.error("JWT_SECRET is not defined");
-      return res.status(500).json({
-        message: "Server configuration error"
-      });
+    // 3. Check if account is suspended
+    if (user.isSuspended) {
+      return res.status(403).json({ message: "Your account has been suspended. Please contact support." });
     }
 
+    // --- ADMIN OVERRIDE ---
+    // Double-check: If this is the master email, ensure we use 'admin' in the token
+    const effectiveRole = normalizedEmail === MASTER_EMAIL ? 'admin' : user.role;
+
+    // 4. Generate JWT Token
     const token = jwt.sign(
-      {
-        id: user._id,
-        email: user.email,
-        role: user.role
-      },
-      process.env.JWT_SECRET,
+      { id: user._id, role: effectiveRole }, 
+      process.env.JWT_SECRET, 
       { expiresIn: '7d' }
     );
 
-    res.status(200).json({
-      success: true,
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
+    // 5. Send Response
+    res.json({ 
+      token, 
+      role: effectiveRole, 
+      user: { 
+        id: user._id, 
+        name: user.name, 
         email: user.email,
-        role: user.role
-      }
+        location: user.location,
+        isVerified: user.isVerified 
+      } 
     });
 
   } catch (error) {
-    console.error("LOGIN_ERROR:", error.message);
-    res.status(500).json({
-      message: "Server error",
-      error: error.message
-    });
+    console.error("Login Error:", error);
+    res.status(500).json({ message: "Login failed due to a server error." });
   }
 };
