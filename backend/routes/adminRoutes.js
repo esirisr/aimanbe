@@ -1,20 +1,12 @@
 import express from 'express';
 const router = express.Router();
-import { 
-  getAdminDashboardData, 
-  verifyPro, 
-  toggleSuspension, 
-  deleteUser 
-} from '../controllers/adminController.js';
+import { getAdminDashboardData, verifyPro, toggleSuspension, deleteUser } from '../controllers/adminController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
-// All routes here require login and admin role (or master email)
 router.use(protect);
-router.use(authorize('admin'));
-
 router.get('/dashboard', getAdminDashboardData);
-router.post('/verify', verifyPro);
-router.post('/toggle-suspension', toggleSuspension);
-router.post('/delete', deleteUser);
+router.patch('/verify/:id', authorize('admin'), verifyPro);
+router.patch('/toggle-suspension/:id', authorize('admin'), toggleSuspension);
+router.delete('/user/:id', authorize('admin'), deleteUser);
 
 export default router;
