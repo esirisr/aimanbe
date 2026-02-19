@@ -3,23 +3,16 @@ import mongoose from 'mongoose';
 const userSchema = new mongoose.Schema({
   name: { 
     type: String, 
-    required: [true, 'Name is required'], 
-    trim: true,
-    minlength: [3, 'Name must be at least 3 characters']
+    required: true 
   },
   email: { 
     type: String, 
-    required: [true, 'Email is required'], 
-    unique: true, 
-    lowercase: true, 
-    trim: true,
-    // Note: The logic in authController handles the master admin 'himilo@gmail.com'
-    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please fill a valid email address']
+    required: true, 
+    unique: true 
   },
   password: { 
     type: String, 
-    required: [true, 'Password is required'],
-    minlength: [6, 'Password must be at least 6 characters']
+    required: true 
   },
   role: { 
     type: String, 
@@ -28,46 +21,40 @@ const userSchema = new mongoose.Schema({
   },
   location: { 
     type: String, 
-    required: [true, 'Location is required'],
-    lowercase: true, 
-    trim: true,
-    default: 'hargeisa' // Matching your registration fallback
+    default: 'Not Specified' 
   },
   phone: { 
-    type: String, 
-    required: [true, 'Phone number is required'], 
-    trim: true,
-    match: [/^[+]*[(]{0,1}[0-9]{1,4}[)]{0,1}[-\s./0-9]*$/, 'Please fill a valid phone number']
+    type: String 
   },
-  // Professionals need verification, Admins are verified by default
-  isVerified: { 
-    type: Boolean, 
-    default: false 
+  // Used for professional branding on cards
+  businessName: { 
+    type: String 
   },
-  isSuspended: { 
-    type: Boolean, 
-    default: false 
+  // Matches the dropdown category logic in your booking controller
+  businessCategory: { 
+    type: String 
   },
+  // Array to store specific tags like ['electrician']
   skills: { 
     type: [String], 
     default: [] 
   },
+  // Logic driver: Professionals start as 'Under Review'
+  isVerified: { 
+    type: Boolean, 
+    default: false 
+  },
+  // Updated: Initialized at 0 so "New" can be displayed if no reviews exist
   rating: { 
     type: Number, 
     default: 0 
   },
+  // NEW: Tracks the total number of customer ratings
   reviewCount: { 
-    type: Number, 
-    default: 0 
-  },
-  dailyRequestCount: { 
     type: Number, 
     default: 0 
   }
 }, { timestamps: true });
-
-// Optional: Indexing email for faster lookups since we use it heavily in middleware
-userSchema.index({ email: 1 });
 
 const User = mongoose.model('User', userSchema);
 export default User;
