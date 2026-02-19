@@ -1,0 +1,28 @@
+# --- SENSITIVE DATA ---
+# This ensures your API keys and Agent 377 266 credentials stay local
+.env
+.env.local
+.env.production
+.env.development
+
+# --- DEPENDENCIES ---
+# Railway will install these automatically using your package.json
+node_modules/
+jspm_packages/
+
+# --- BUILD OUTPUTS ---
+# Only the source code should be pushed; Railway builds the project itself
+dist/
+build/
+.next/
+out/
+
+# --- DEBUG & LOGS ---
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# --- OS FILES ---
+.DS_Store
+Thumbs.db
